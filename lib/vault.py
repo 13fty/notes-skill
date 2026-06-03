@@ -9,6 +9,8 @@ import platform
 from pathlib import Path
 from typing import Any
 
+from lib.config import get_vault_path
+
 
 # ── Constants ────────────────────────────────────────────────────────────────────
 
@@ -95,7 +97,11 @@ def validate_vault(path: str | Path) -> dict[str, Any]:
 
     # Optional: has at least one .md file
     if checks["is_directory"]:
-        has_md = any(p.rglob("*.md"))
+        try:
+            has_md = any(p.rglob("*.md"))
+        except PermissionError:
+            has_md = False
+            warnings.append("Permission denied while scanning vault for .md files")
         checks["has_markdown"] = has_md
         if not has_md:
             warnings.append("No .md files found — vault may be empty")
@@ -171,7 +177,7 @@ def search_vaults(max_depth: int = 3) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
 
     for root in roots:
-        for dirpath, dirnames, _ in os.walk(root):
+        for dirpath, dirnames, _ in os.walk(root, onerror=lambda e: None):
             depth = len(Path(dirpath).relative_to(root).parts)
             if depth > max_depth:
                 dirnames.clear()
@@ -270,8 +276,6 @@ def repair_vault(configured_path: str, discovered_vaults: list[dict[str, Any]] |
 
 def doctor_check() -> dict[str, Any]:
     """Return a diagnostic snapshot for the vault subsystem."""
-    from lib.config import get_vault_path
-
     vault_path = get_vault_path()
     result: dict[str, Any] = {
         "vault_configured": vault_path is not None,
