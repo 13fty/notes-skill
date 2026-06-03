@@ -379,14 +379,17 @@ section: ## AI Sessions
 ```
 ````
 
-The user can then paste or use a sync script. See `scripts/sync.py` for automated vault writing.
+The user can then paste or use the sync CLI. Run `python scripts/cli.py sync` (or pipe content to it) for automated vault writing.
 
 ---
 
 ## References
 
-- `references/templates.md` — Full Markdown templates for Daily Note, Project Note, Tech Index, Q&A Archive, Knowledge Graph
-- `scripts/sync.py` — Python script to write output blocks directly to a local Obsidian vault
-- `scripts/parse_session.py` — Helpers for extracting tech/QA/links from raw conversation text
+- `templates/daily.md`, `templates/project.md`, `templates/knowledge.md` — Full Markdown templates for notes
+- `scripts/cli.py` — Unified CLI for all operations: `sync`, `init`, `validate`, `search`, `repair`, `migrate`, `doctor`
+- `lib/sync.py` — Core sync engine: parses obsidian-file blocks and writes to vault
+- `lib/parser.py` — Helpers for extracting tech/QA/links from raw conversation text
+- `lib/vault.py` — Vault discovery, validation, and repair
+- `lib/config.py` — Configuration and state file management
 
-Read these when you need the full template content or want to run automated sync.
+Read these when you need the full template content or want to understand the sync internals.
