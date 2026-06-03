@@ -6,7 +6,8 @@
       "Bash(git commit *)",
       "Bash(git *)",
       "Bash(python3 *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(chmod +x *)"
     ]
   }
 }
