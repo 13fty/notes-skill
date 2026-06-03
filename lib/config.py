@@ -8,10 +8,9 @@ Paths:
 
 import json
 import os
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 # ── Paths ────────────────────────────────────────────────────────────────────────
@@ -46,6 +45,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "sync_stats": {
         "total_sessions": 0,
         "total_files_written": 0,
+        "total_files_updated": 0,
         "total_qa_extracted": 0,
         "total_tech_entries": 0,
         "first_sync": None,
@@ -124,16 +124,13 @@ def set_vault_path(path: str) -> None:
 
 def get_preference(key: str, default: Any = None) -> Any:
     """Read a single preference by dotted key, e.g. 'language' or 'create_stubs'."""
-    cfg = load_config()
-    prefs = cfg.get("preferences", {})
-    return prefs.get(key, default)
+    val = config_get(f"preferences.{key}")
+    return val if val is not None else default
 
 
 def set_preference(key: str, value: Any) -> None:
     """Set a single preference."""
-    cfg = load_config()
-    cfg.setdefault("preferences", {})[key] = value
-    save_config(cfg)
+    config_set(f"preferences.{key}", value)
 
 
 def config_get(key: str) -> Any | None:
@@ -200,7 +197,7 @@ def record_sync(session_id: str, project: str, files_written: int, files_updated
     stats = state["sync_stats"]
     stats["total_sessions"] += 1
     stats["total_files_written"] += files_written
-    stats["total_files_updated"] = stats.get("total_files_updated", 0) + files_updated
+    stats["total_files_updated"] += files_updated
     if stats["first_sync"] is None:
         stats["first_sync"] = now
 
@@ -241,7 +238,7 @@ def get_discovered_vaults(valid_only: bool = False) -> list[dict]:
 
 # ── Migrate API ─────────────────────────────────────────────────────────────────
 
-MIGRATIONS: dict[str, callable] = {}
+MIGRATIONS: dict[str, Callable] = {}
 
 
 def register_migration(from_version: str):
