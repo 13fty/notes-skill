@@ -2,41 +2,82 @@
 name: obsidian
 description: >
   Process AI agent conversation sessions and sync structured knowledge into Obsidian vaults.
-  Use this skill whenever the user wants to: summarize an AI/Claude conversation into Obsidian notes,
+  Use this skill whenever the user wants to: summarize an AI conversation into Obsidian notes,
   update a Daily Note or Project Note with session insights, extract tech stacks or Q&A from a chat,
   create Wiki Links between notes, build project associations, or maintain a knowledge graph in Obsidian.
   Trigger on phrases like "save to obsidian", "update my notes", "log this session", "add to daily note",
   "extract tech stack", "create wiki links", "update project note", or any request to persist
   conversation content into an Obsidian vault. Even if the user just says "记录一下" or "整理笔记",
   treat it as a potential Obsidian sync task.
+  Works with Claude Code, Gemini CLI, Codex, Cursor, and other AI agents.
 ---
+
+**Note**: `<vault_path>` refers to the path configured in `~/.obsidian-skill/config.json`.
 
 # Obsidian Knowledge Sync Skill
 
 This skill processes AI agent conversation sessions and writes structured, interlinked Markdown notes
-into an Obsidian vault. It handles eight core capabilities.
+into an Obsidian vault.
 
-## Workflow Overview
+**Prerequisite:** Before any sync workflow, run `python scripts/cli.py doctor` to verify configuration.
+If no vault is configured, the skill will guide you through `python scripts/cli.py init` automatically.
 
-```
-Input: Conversation transcript / session summary
-         │
-         ▼
-    1. Summarize Session
-         │
-         ├──► 2. Update Daily Note
-         ├──► 3. Update Project Note
-         ├──► 4. Extract Tech Stack  ──────────────────► Tech Stack Index
-         ├──► 5. Extract Q&A Pairs   ──────────────────► Q&A Archive
-         ├──► 6. Generate Wiki Links ─────────────────┐
-         ├──► 7. Project Associations ────────────────┤
-         └──► 8. Knowledge Graph Edges ───────────────┘
-                                                       │
-                                                       ▼
-                                              Final Linked Note Set
-```
+The vault path is stored in `~/.obsidian-skill/config.json`. All note paths below are relative to this vault root.
 
 ---
+
+## Step 0 — Configuration Check
+
+Before executing any sync workflow, ensure the configuration exists and the vault is accessible.
+
+### 0.1 Load Configuration
+
+Read `~/.obsidian-skill/config.json`. Parse with `json.loads()`.
+
+```
+Read ~/.obsidian-skill/config.json
+    ↓
+Exists?
+├── Yes → Extract vault_path → Proceed to 0.2 Vault Validation
+│
+└── No → Proceed to 0.3 First-Time Setup
+```
+
+### 0.2 Vault Validation
+
+When config exists, verify the vault is still usable:
+
+1. Call `python scripts/cli.py validate --json`.
+2. Parse the JSON output.
+3. If `valid: true` → vault is healthy, continue to Step 1.
+4. If `valid: false` → vault is broken.
+   - Call `python scripts/cli.py search --json` to find available vaults.
+   - Call `python scripts/cli.py repair` to attempt automatic recovery.
+   - If repair finds a candidate, use `AskUserQuestion` to confirm the new path.
+   - If repair fails, proceed to 0.3 First-Time Setup.
+
+### 0.3 First-Time Setup
+
+When no config exists or repair fails:
+
+1. **Automatically search for vaults**: Run `python scripts/cli.py search --json`.
+2. **If vaults found**:
+   - Use `AskUserQuestion` to present the list. Let the user select one.
+   - On selection, run `python scripts/cli.py init --vault "<selected_path>"`.
+3. **If no vaults found**:
+   - Use `AskUserQuestion` to ask the user to input their vault path.
+   - Example: "No Obsidian vaults found automatically. Please enter the full path to your Obsidian vault:"
+   - Validate the path by checking that it exists and contains a `.obsidian` subdirectory.
+   - Run `python scripts/cli.py init --vault "<user_path>"`.
+4. **Fallback**: If `AskUserQuestion` is unavailable or the user declines, ask in plain text:
+   > "Please reply with the full path to your Obsidian vault. Example: `/Users/name/Documents/Obsidian`"
+   - Wait for the user's text response containing a path.
+   - Validate and run `python scripts/cli.py init --vault "<path>"`.
+
+### 0.4 Configuration Complete
+
+Once config exists and vault passes validation, the skill has everything it needs.
+Proceed to Step 1 — Summarize Session.
 
 ## Step 1 — Summarize AI Agent Session
 
@@ -64,7 +105,7 @@ Rules:
 
 ## Step 2 — Update Daily Note
 
-**File path pattern**: `{vault}/Daily/{YYYY-MM-DD}.md`
+**File path pattern**: `<vault_path>/Daily/{YYYY-MM-DD}.md`
 
 ### Insertion Strategy
 
@@ -93,7 +134,7 @@ Rules:
 
 ## Step 3 — Update Project Note
 
-**File path pattern**: `{vault}/Projects/{ProjectName}.md`
+**File path pattern**: `<vault_path>/Projects/{ProjectName}.md`
 
 ### Project Note Structure (create if missing)
 
@@ -172,7 +213,7 @@ Parse the session for all mentioned technologies. For each tech found:
 
 ### Global Index Update
 
-Also update `{vault}/Meta/Tech Stack Index.md`:
+Also update `<vault_path>/Meta/Tech Stack Index.md`:
 
 ```markdown
 ## {TechName}
@@ -213,7 +254,7 @@ Scan the session for question/answer, problem/fix, error/resolution pairs.
 
 ### Storage Locations
 1. **In Project Note** under `## Problems & Solutions`
-2. **In Q&A Archive** at `{vault}/Meta/QA Archive.md` — append in reverse-chronological order
+2. **In Q&A Archive** at `<vault_path>/Meta/QA Archive.md` — append in reverse-chronological order
 
 ---
 
@@ -281,7 +322,7 @@ After processing session content, infer relationships between projects.
 
 ## Step 8 — Maintain Knowledge Graph
 
-Write machine-readable graph edges to `{vault}/Meta/Knowledge Graph.md`.
+Write machine-readable graph edges to `<vault_path>/Meta/Knowledge Graph.md`.
 
 ### Edge Format (Dataview-compatible)
 
@@ -299,7 +340,7 @@ Append new edges; never delete existing ones. Deduplicate by `(Source, Relation,
 
 ### Node Registry
 
-Also maintain `{vault}/Meta/Nodes.md`:
+Also maintain `<vault_path>/Meta/Nodes.md`:
 
 ```markdown
 | Node | Type | First Seen | Projects |
