@@ -1,177 +1,110 @@
 ---
 name: obsidian
 description: >
-  Process AI agent conversation sessions and sync structured knowledge into Obsidian vaults.
-  Use this skill whenever the user wants to: summarize an AI conversation into Obsidian notes,
-  update a Daily Note or Project Note with session insights, extract tech stacks or Q&A from a chat,
-  create Wiki Links between notes, build project associations, or maintain a knowledge graph in Obsidian.
-  Trigger on phrases like "save to obsidian", "update my notes", "log this session", "add to daily note",
-  "extract tech stack", "create wiki links", "update project note", or any request to persist
-  conversation content into an Obsidian vault. Even if the user just says "记录一下" or "整理笔记",
-  treat it as a potential Obsidian sync task.
+  Process AI agent conversation sessions and sync structured knowledge into an Obsidian vault.
+  Trigger on: "save to obsidian", "update my notes", "log this session", "记录一下", "整理笔记",
+  "add to daily note", "extract tech stack", "create wiki links", "update project note",
+  or any request to persist conversation content into an Obsidian vault.
   Works with Claude Code, Gemini CLI, Codex, Cursor, and other AI agents.
 ---
 
-**Note**: `<vault_path>` refers to the path configured in `~/.obsidian-skill/config.json`.
-
 # Obsidian Knowledge Sync Skill
 
-This skill processes AI agent conversation sessions and writes structured, interlinked Markdown notes
-into an Obsidian vault.
-
-**Prerequisite:** Before any sync workflow, run `python scripts/cli.py doctor` to verify configuration.
-If no vault is configured, the skill will guide you through `python scripts/cli.py init` automatically.
-
-The vault path is stored in `~/.obsidian-skill/config.json`. All note paths below are relative to this vault root.
+Process the current conversation session and write structured, interlinked Markdown notes
+into the user's Obsidian vault. Eight steps — execute them in order.
 
 ---
 
-## Step 0 — Configuration Check
+## Step 0 — Ensure Vault Access
 
-Before executing any sync workflow, ensure the configuration exists and the vault is accessible.
+The vault path is stored in `~/.obsidian-skill/config.json`. This file is a simple JSON:
 
-### 0.1 Load Configuration
-
-Read `~/.obsidian-skill/config.json`. Parse with `json.loads()`.
-
-```
-Read ~/.obsidian-skill/config.json
-    ↓
-Exists?
-├── Yes → Extract vault_path → Proceed to 0.2 Vault Validation
-│
-└── No → Proceed to 0.3 First-Time Setup
+```json
+{"vault_path": "/absolute/path/to/vault"}
 ```
 
-### 0.2 Vault Validation
+### 0.1 Check config exists
 
-When config exists, verify the vault is still usable:
+Read `~/.obsidian-skill/config.json`. If it exists and contains a `vault_path`, go to 0.2.
 
-1. Call `python scripts/cli.py validate --json`.
-2. Parse the JSON output.
-3. If `valid: true` → vault is healthy, continue to Step 1.
-4. If `valid: false` → vault is broken.
-   - Call `python scripts/cli.py search --json` to find available vaults.
-   - Call `python scripts/cli.py repair` to attempt automatic recovery.
-   - If repair finds a candidate, use `AskUserQuestion` to confirm the new path.
-   - If repair fails, proceed to 0.3 First-Time Setup.
+### 0.2 Validate the vault
 
-### 0.3 First-Time Setup
+Run: `python scripts/validate_vault.py --path "<vault_path>"`. Parse the JSON output.
 
-When no config exists or repair fails:
+- `valid: true` → vault is ready. Store `<vault_path>` in memory as `VAULT`. Continue to Step 1.
+- `valid: false` → vault is broken. Go to 0.3.
 
-1. **Automatically search for vaults**: Run `python scripts/cli.py search --json`.
-2. **If vaults found**:
-   - Use `AskUserQuestion` to present the list. Let the user select one.
-   - On selection, run `python scripts/cli.py init --vault "<selected_path>"`.
-3. **If no vaults found**:
-   - Use `AskUserQuestion` to ask the user to input their vault path.
-   - Example: "No Obsidian vaults found automatically. Please enter the full path to your Obsidian vault:"
-   - Validate the path by checking that it exists and contains a `.obsidian` subdirectory.
-   - Run `python scripts/cli.py init --vault "<user_path>"`.
-4. **Fallback**: If `AskUserQuestion` is unavailable or the user declines, ask in plain text:
-   > "Please reply with the full path to your Obsidian vault. Example: `/Users/name/Documents/Obsidian`"
-   - Wait for the user's text response containing a path.
-   - Validate and run `python scripts/cli.py init --vault "<path>"`.
+### 0.3 First-time setup (or repair)
 
-### 0.4 Configuration Complete
+Run: `python scripts/search_vault.py --json`. Parse the JSON array.
 
-Once config exists and vault passes validation, the skill has everything it needs.
-Proceed to Step 1 — Summarize Session.
-
-## Step 1 — Summarize AI Agent Session
-
-Before writing any note, produce a **Session Summary** from the conversation input.
-
-### Summary Schema
-
-```markdown
-## Session Summary · {YYYY-MM-DD HH:mm}
-
-**主题**: {one-line topic}
-**项目**: {project name, or "通用"}
-**持续时间**: {estimated, e.g. "~45 min"}
-**核心产出**: {bullet list, max 5 items}
-**未解决问题**: {bullet list, or "无"}
-**下一步行动**: {bullet list with owner/deadline if known}
+**If vaults found:**
+Use `AskUserQuestion` to present them. Let the user pick one.
+Write the chosen path to `~/.obsidian-skill/config.json`:
+```bash
+mkdir -p ~/.obsidian-skill
+echo '{"vault_path": "<chosen_path>"}' > ~/.obsidian-skill/config.json
 ```
+Store as `VAULT`. Continue to Step 1.
 
-Rules:
-- Keep it ≤ 20 lines
-- Use past tense ("解决了", "实现了")
-- Never include raw code blocks in the summary itself; those go in Project Note sections
+**If no vaults found:**
+Use `AskUserQuestion` to ask: "No Obsidian vaults found. Please enter the full path to your Obsidian vault (e.g. `/Users/name/Documents/Obsidian`):"
+Validate with `python scripts/validate_vault.py --path "<user_path>"`.
+If valid, write config as above. If invalid, ask again.
+
+**Fallback** (AskUserQuestion unavailable): Ask in plain text, wait for reply, validate manually.
+
+---
+
+## Step 1 — Summarize Session
+
+Read the current conversation. Extract:
+
+| Field | Instruction |
+|-------|------------|
+| **主题** | One-line topic in the user's preferred language |
+| **项目** | Project name inferred from context, or "通用" |
+| **核心产出** | Bullet list, max 5 items of what was accomplished |
+| **未解决问题** | Bullet list of open issues, or "无" |
+| **下一步行动** | Bullet list of next steps, with owner/deadline if mentioned |
+
+Keep the summary ≤20 lines. Use past tense. No code blocks in the summary.
 
 ---
 
 ## Step 2 — Update Daily Note
 
-**File path pattern**: `<vault_path>/Daily/{YYYY-MM-DD}.md`
+File: `<VAULT>/Daily/YYYY-MM-DD.md`
 
-### Insertion Strategy
-
-1. Read existing Daily Note if it exists; otherwise create from template (see `templates/daily.md`)
-2. Find or create the `## AI Sessions` section
-3. Append a collapsible block:
+1. **Read** the Daily Note if it exists. If not, create from `templates/daily.md`.
+2. Find or create the `## AI Sessions` section.
+3. **Append** a callout block below the section header:
 
 ```markdown
-## AI Sessions
-
-> [!summary]- {HH:mm} · {Session Topic} · [[{ProjectName}]]
-> {Session Summary from Step 1}
-> 
-> **Tech**: {comma-separated tech tags}
+> [!summary]- HH:mm · {Session Topic} · [[{ProjectName}]]
+> {Summary paragraph from Step 1}
+> **Tech**: {comma-separated tech tags from Step 4}
 > **Tags**: #{tag1} #{tag2}
 ```
 
-4. Update the `## Today's Progress` checklist if present — check off completed items that match session outputs
-5. Append any new `## Action Items` entries with `- [ ]` checkboxes
+4. If the `## Today's Progress` section has checkboxes matching session outputs, check them off.
+5. Append any new action items under `## Action Items` as `- [ ]`.
 
-### Conflict Handling
-- If the section already exists, **append**, never overwrite
-- Preserve all existing content above and below the insertion point
+**Rule:** Always append, never overwrite existing content above or below the insertion point.
 
 ---
 
 ## Step 3 — Update Project Note
 
-**File path pattern**: `<vault_path>/Projects/{ProjectName}.md`
+File: `<VAULT>/Projects/{ProjectName}.md`
 
-### Project Note Structure (create if missing)
-
-```markdown
----
-tags: [project, {tech-tags}]
-status: active | paused | completed
-created: {YYYY-MM-DD}
-updated: {YYYY-MM-DD}
----
-
-# {ProjectName}
-
-## Overview
-{one paragraph project description}
-
-## Tech Stack
-{see Step 4 output}
-
-## Session Log
-{chronological session entries — newest first}
-
-## Problems & Solutions
-{see Step 5 output}
-
-## Related Projects
-{see Step 7 output}
-
-## Knowledge Nodes
-{see Step 8 output}
-```
-
-### Session Log Entry Format
+1. **Read** the Project Note if it exists. If not, create from `templates/project.md`.
+   Replace `{{project}}` with the project name.
+2. Under `## Session Log`, **prepend** (newest first):
 
 ```markdown
-### {YYYY-MM-DD} · {Session Topic}
-> [[Daily/{YYYY-MM-DD}]] · {duration}
+### YYYY-MM-DD · {Session Topic}
+> [[Daily/YYYY-MM-DD]] · ~{duration}
 
 {summary paragraph}
 
@@ -182,26 +115,26 @@ updated: {YYYY-MM-DD}
 **Open Issues**: {or "none"}
 ```
 
-Insert at the **top** of `## Session Log` (newest-first order).
+3. Update the frontmatter `updated:` field to today's date.
 
 ---
 
 ## Step 4 — Extract Tech Stack
 
-Parse the session for all mentioned technologies. For each tech found:
+Scan the conversation for technologies mentioned. Use this classification:
 
-### Detection Rules
-- Programming languages: Python, TypeScript, Swift, Rust, Go …
-- Frameworks/libraries: FastAPI, React, PyQt5, SwiftUI, OpenCV …
-- Tools & CLIs: Docker, Git, npm, pip, Homebrew …
-- APIs/services: OpenAI, Anthropic, DeepSeek, WeChat …
-- Concepts: REST, IPC, PTY, MediaPipe …
+| Category | Look for |
+|----------|---------|
+| Language | Python, TypeScript, JavaScript, Swift, Rust, Go, Kotlin, Java, C++, C#, Ruby, PHP, Bash, Shell |
+| Framework | FastAPI, Flask, Django, React, Vue, Next.js, Nuxt, PyQt5, PyQt6, SwiftUI, UIKit, Express, NestJS, Spring, Rails, Laravel |
+| Tool | Docker, Git, npm, pip, Homebrew, Make, Webpack, Vite, Pytest, Jest, GitHub Actions, Nginx, Caddy |
+| API/Service | Anthropic, OpenAI, DeepSeek, Gemini, Claude, WeChat, Telegram, Slack, AWS, GCP, Azure, Vercel, Railway |
+| Library | OpenCV, MediaPipe, NumPy, Pandas, Matplotlib, SQLAlchemy, Pydantic, Uvicorn, aiohttp, requests, Tailwind, shadcn |
+| Concept | REST, GraphQL, WebSocket, gRPC, IPC, PTY, MVC, MVVM, microservices, RAG, embeddings, LLM, AI agent |
 
-### Output Format (for Project Note `## Tech Stack`)
+**Output — Update Project Note `## Tech Stack`:**
 
 ```markdown
-## Tech Stack
-
 | Category | Technologies |
 |----------|-------------|
 | Language | Python · TypeScript |
@@ -211,37 +144,30 @@ Parse the session for all mentioned technologies. For each tech found:
 | Concept | IPC · PTY |
 ```
 
-### Global Index Update
+**Output — Update `<VAULT>/Meta/Tech Stack Index.md`:**
 
-Also update `<vault_path>/Meta/Tech Stack Index.md`:
+For each tech found, add or update an entry. Merge with existing entries — never duplicate.
 
 ```markdown
 ## {TechName}
-- Used in: [[ProjectA]], [[ProjectB]]
-- Last seen: {YYYY-MM-DD}
-- Notes: {any version or usage notes}
+- Used in: [[Projects/{ProjectName}]]
+- Last seen: YYYY-MM-DD
 ```
-
-Merge with existing entries — never duplicate.
 
 ---
 
-## Step 5 — Extract Problems & Solutions
+## Step 5 — Extract Q&A / Problem-Solution Pairs
 
-Scan the session for question/answer, problem/fix, error/resolution pairs.
+Scan for patterns: errors, "报错", "怎么", "why does", "not working", followed by fixes, "solved by", "解决了", "成功了".
 
-### Detection Signals
-- Phrases: "报错", "error", "issue", "fix", "solution", "how to", "为什么", "怎么", "solved by"
-- Code snippets preceded by an error, followed by a working version
-- User expressing frustration → Claude providing a resolution
+For each pair found:
 
-### Q&A Entry Format
+**In Project Note `## Problems & Solutions`:**
 
 ```markdown
 ### {Short problem title}
-**Date**: {YYYY-MM-DD}
-**Project**: [[{ProjectName}]]
-**Context**: {1-2 sentences of context}
+**Date**: YYYY-MM-DD
+**Context**: {1-2 sentences}
 
 **Problem**:
 {description}
@@ -249,39 +175,30 @@ Scan the session for question/answer, problem/fix, error/resolution pairs.
 **Solution**:
 {description or code block}
 
-**Tags**: #{tag1} #{tag2}
+**Tags**: #tag1 #tag2
 ```
 
-### Storage Locations
-1. **In Project Note** under `## Problems & Solutions`
-2. **In Q&A Archive** at `<vault_path>/Meta/QA Archive.md` — append in reverse-chronological order
+**In `<VAULT>/Meta/QA Archive.md`:**
+Append the same entry in reverse-chronological order.
 
 ---
 
-## Step 6 — Auto-create Wiki Links
+## Step 6 — Generate Wiki Links
 
-Scan all generated text for proper nouns, tech names, and project references. Replace bare mentions with `[[WikiLinks]]`.
+Scan all generated text and apply `[[WikiLinks]]`:
 
-### Linking Rules
+| Condition | Link format | Rule |
+|-----------|------------|------|
+| Date mention | `[[Daily/YYYY-MM-DD]]` | first occurrence only |
+| Known project name | `[[Projects/Name]]` | first occurrence only |
+| Tech in Tech Stack Index | `[[Tech/Name]]` or inline tag | first occurrence only |
 
-| Condition | Action |
-|-----------|--------|
-| Mentions a known project | `[[Projects/ProjectName]]` |
-| Mentions a tech in Tech Stack Index | `[[Tech/TechName]]` or inline tag |
-| Mentions a date | `[[Daily/YYYY-MM-DD]]` |
-| Mentions a person / team | `[[People/Name]]` if note exists |
-| First occurrence only | Link it; subsequent mentions = plain text |
+If a link target doesn't exist as a note, create a minimal stub:
 
-### Link Validation
-Before writing, check if target note exists in vault:
-- **Exists** → standard `[[link]]`
-- **Doesn't exist** → create a stub note at the target path with frontmatter only, then link
-
-Stub template:
 ```markdown
 ---
 tags: [stub]
-created: {YYYY-MM-DD}
+created: YYYY-MM-DD
 ---
 # {Title}
 > [!note] Stub — to be filled in
@@ -289,107 +206,70 @@ created: {YYYY-MM-DD}
 
 ---
 
-## Step 7 — Auto-establish Project Associations
+## Step 7 — Infer Project Associations
 
-After processing session content, infer relationships between projects.
+Check relationships between the current project and others in the vault:
 
-### Association Types
+| Signal | Relation |
+|--------|----------|
+| ≥2 overlapping tech stack items with another project | `shares-stack-with` |
+| User says "based on X", "building on X" | `evolved-from` |
+| User says "similar to X", "like X" | `inspired-by` |
+| A library appears in both projects | `uses` (for the library) |
 
-```
-[[ProjectA]] --uses--> [[LibraryX]]
-[[ProjectA]] --inspired-by--> [[ProjectB]]
-[[ProjectA]] --shares-stack-with--> [[ProjectC]]
-[[ProjectA]] --evolved-from--> [[ProjectD]]
-```
-
-### Detection Logic
-1. Same tech stack overlap ≥ 2 items → `shares-stack-with`
-2. Current project was mentioned as building on a previous one → `evolved-from`
-3. A library/tool first used in ProjectA now appears in ProjectB → `uses` (for the lib)
-4. User explicitly says "similar to" or "like X" → `inspired-by`
-
-### Output Location: `## Related Projects` in Project Note
+**Output — In Project Note `## Related Projects`:**
 
 ```markdown
-## Related Projects
-
-- [[AgentWatch]] — `shares-stack-with` (Swift, SwiftUI)
-- [[wxbot]] — `evolved-from` (Node.js + FastAPI architecture)
-- [[PPT Generator]] — `shares-stack-with` (FastAPI, DeepSeek API)
+- [[OtherProject]] — `shares-stack-with` (Python, FastAPI)
+- [[OldProject]] — `evolved-from`
 ```
 
 ---
 
 ## Step 8 — Maintain Knowledge Graph
 
-Write machine-readable graph edges to `<vault_path>/Meta/Knowledge Graph.md`.
-
-### Edge Format (Dataview-compatible)
+Append edges to `<VAULT>/Meta/Knowledge Graph.md` (Dataview-compatible format):
 
 ```markdown
-## Edges
-
 | Source | Relation | Target | Date | Session |
 |--------|----------|--------|------|---------|
-| [[PyQt5]] | used-in | [[FingerCounter]] | 2025-06-01 | [[Daily/2025-06-01]] |
-| [[OpenCV]] | used-in | [[FingerCounter]] | 2025-06-01 | [[Daily/2025-06-01]] |
-| [[FingerCounter]] | evolved-from | [[AgentWatch]] | 2025-06-01 | [[Daily/2025-06-01]] |
+| [[PyQt5]] | used-in | [[FingerCounter]] | YYYY-MM-DD | [[Daily/YYYY-MM-DD]] |
+| [[FingerCounter]] | evolved-from | [[AgentWatch]] | YYYY-MM-DD | [[Daily/YYYY-MM-DD]] |
 ```
 
-Append new edges; never delete existing ones. Deduplicate by `(Source, Relation, Target)` key.
+Deduplicate by `(Source, Relation, Target)`. Never delete existing edges.
 
-### Node Registry
-
-Also maintain `<vault_path>/Meta/Nodes.md`:
+Also update `<VAULT>/Meta/Nodes.md`:
 
 ```markdown
 | Node | Type | First Seen | Projects |
 |------|------|-----------|---------|
-| [[PyQt5]] | framework | 2025-05-10 | [[FingerCounter]], [[DormManager]] |
+| [[PyQt5]] | framework | YYYY-MM-DD | [[FingerCounter]], [[DormManager]] |
 ```
 
 ---
 
 ## Output Checklist
 
-Before finishing, confirm:
+Before finishing, confirm all steps:
 
-- [ ] Session Summary produced
-- [ ] Daily Note updated (section appended, not overwritten)
-- [ ] Project Note updated (session log entry at top)
-- [ ] Tech Stack table updated in Project Note + Index
-- [ ] Q&A pairs extracted and stored in both Project Note and Archive
-- [ ] All proper nouns wiki-linked; stubs created for missing targets
-- [ ] Project associations inferred and written
-- [ ] Knowledge Graph edges appended; Nodes registry updated
-
----
-
-## File Output Format
-
-When Claude cannot directly write to the vault, output **one fenced block per file**, labeled with its vault path:
-
-````
-```obsidian-file
-path: Daily/2025-06-03.md
-action: append | create | replace-section
-section: ## AI Sessions
----
-{file content here}
-```
-````
-
-The user can then paste or use the sync CLI. Run `python scripts/cli.py sync` (or pipe content to it) for automated vault writing.
+- [ ] Step 0: Vault accessible, `VAULT` path stored
+- [ ] Step 1: Session summary produced (topic, project, outcomes, next steps)
+- [ ] Step 2: Daily Note updated (appended, not overwritten)
+- [ ] Step 3: Project Note updated (session log entry at top)
+- [ ] Step 4: Tech Stack table updated (Project Note + Meta Index)
+- [ ] Step 5: Q&A pairs extracted (Project Note + QA Archive)
+- [ ] Step 6: Wiki links applied to all proper nouns; stubs created for missing targets
+- [ ] Step 7: Project associations inferred and written
+- [ ] Step 8: Knowledge Graph edges appended; Nodes registry updated
 
 ---
 
-## References
+## Templates
 
-- `templates/daily.md`, `templates/project.md`, `templates/knowledge.md` — Full Markdown templates for notes
-- `scripts/cli.py` — Unified CLI for all operations: `sync`, `init`, `validate`, `search`, `repair`, `migrate`, `doctor`
-- `lib/sync.py` — Core sync engine: parses obsidian-file blocks and writes to vault
-- `lib/parser.py` — Helpers for extracting tech/QA/links from raw conversation text
-- `lib/vault.py` — Vault discovery, validation, and repair
-- `lib/config.py` — Configuration and state file management
+Full templates are in `templates/`:
+- `templates/daily.md` — Daily Note structure
+- `templates/project.md` — Project Note structure
+- `templates/knowledge.md` — Knowledge Graph structure
 
-Read these when you need the full template content or want to understand the sync internals.
+Read them when creating a note for the first time.

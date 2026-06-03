@@ -1,83 +1,59 @@
 # Obsidian Second Brain
 
-Sync AI agent conversation sessions into an [Obsidian](https://obsidian.md) vault — structured notes, knowledge graphs, and cross-referenced insights.
+An AI agent skill that processes conversation sessions and syncs structured knowledge into an [Obsidian](https://obsidian.md) vault.
 
 Works with Claude Code, Gemini CLI, Codex, Cursor, and other AI agents.
 
 ## Quick Start
 
+**For Claude Code users:** Register `skill.md` as a custom skill. The first time it runs, it will guide you through vault setup.
+
+**Manual setup:**
+
 ```bash
-# 1. Clone
-git clone <repo-url>
-cd obsidian-second-brain
+# Find your vault
+python scripts/search_vault.py --json
 
-# 2. Initialize — auto-discovers your vault
-python scripts/cli.py init
+# Validate a vault
+python scripts/validate_vault.py --path ~/Documents/Obsidian
 
-# 3. Run a diagnostic
-python scripts/cli.py doctor
-
-# 4. Sync AI output to vault
-cat session_output.md | python scripts/cli.py sync --project my-project
+# Set config manually (or let the AI do it for you)
+mkdir -p ~/.obsidian-skill
+echo '{"vault_path": "/path/to/your/vault"}' > ~/.obsidian-skill/config.json
 ```
 
-## Commands
+## How It Works
 
-| Command | What it does |
-|---------|-------------|
-| `init` | First-time wizard: search → select → validate → save config |
-| `config list` | Show current configuration |
-| `config set <key> <value>` | Change a preference |
-| `validate` | Check vault health |
-| `search` | Find all Obsidian vaults on this system |
-| `repair` | Recover when vault path breaks |
-| `sync` | Write AI output blocks into vault |
-| `migrate` | Upgrade config format version |
-| `doctor` | Full diagnostic report |
+The AI reads `skill.md` and executes 8 steps:
 
-## Configuration
-
-Config and state are stored at `~/.obsidian-skill/`:
-
-- `config.json` — vault path, preferences, agent type
-- `state.json` — sync history, discovered vaults, statistics
-
-This path is agent-agnostic — all AI agents share the same config.
-
-## Skill Integration
-
-### Claude Code
-
-Register `skill.md` as a custom skill. The skill auto-detects configuration on first run — it will run `python scripts/cli.py search` to find your vault, or ask you for the path.
-
-### Gemini CLI / Codex / Other Agents
-
-Point your agent's instruction file to `skill.md` and ensure `python scripts/cli.py` is on the PATH or referenced by absolute path.
+1. **Ensure Vault Access** — read config, auto-detect vaults, validate path
+2. **Summarize Session** — extract topic, project, outcomes, next steps
+3. **Update Daily Note** — append session summary to `Daily/YYYY-MM-DD.md`
+4. **Update Project Note** — maintain `Projects/<Name>.md` with session log
+5. **Extract Tech Stack** — classify mentioned technologies, update index
+6. **Extract Q&A Pairs** — capture problems and solutions
+7. **Generate Wiki Links** — link dates, projects, technologies
+8. **Maintain Knowledge Graph** — write graph edges and node registry
 
 ## Directory
 
 ```
 obsidian-second-brain/
-├── skill.md              # Core skill instructions (agent-agnostic)
+├── skill.md                  # ⭐ Core: AI reads this and works
 ├── scripts/
-│   └── cli.py            # Unified CLI (8 subcommands)
-├── lib/
-│   ├── config.py         # Config + state management
-│   ├── vault.py          # Vault search, validate, repair
-│   ├── sync.py           # Block parser + vault writer
-│   ├── parser.py         # Tech stack, Q&A, wiki link extraction
-│   └── templates.py      # Template loading + rendering
+│   ├── search_vault.py       # Find Obsidian vaults on disk
+│   └── validate_vault.py     # Check vault health
 ├── templates/
 │   ├── daily.md
 │   ├── project.md
 │   └── knowledge.md
-└── .gitignore
+└── README.md
 ```
 
 ## Requirements
 
-- Python 3.11+
-- No external dependencies (stdlib only)
+- Python 3.9+ (stdlib only, no dependencies)
+- Obsidian vault with `.obsidian` directory
 
 ## License
 
