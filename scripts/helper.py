@@ -2,8 +2,8 @@
 """Search for Obsidian vaults on this system. Outputs JSON array.
 
 Usage:
-    python scripts/search_vault.py          # human-readable
-    python scripts/search_vault.py --json   # JSON output (for AI to parse)
+    python scripts/helper.py          # human-readable
+    python scripts/helper.py --json   # JSON output (for AI to parse)
 """
 
 import json

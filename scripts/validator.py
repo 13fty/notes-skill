@@ -2,8 +2,8 @@
 """Validate whether a path is a usable Obsidian vault. Outputs JSON.
 
 Usage:
-    python scripts/validate_vault.py --path /path/to/vault
-    python scripts/validate_vault.py --path ~/Documents/Obsidian
+    python scripts/validator.py --path /path/to/vault
+    python scripts/validator.py --path ~/Documents/Obsidian
 """
 
 import json
