@@ -9,6 +9,8 @@ Usage:
     python scripts/setup.py --path /vault/dir  # non-interactive with explicit path
 """
 
+from __future__ import annotations
+
 import json
 import os
 import platform
