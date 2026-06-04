@@ -9,6 +9,8 @@ Usage:
     python scripts/extract.py --session-text "..." --output /tmp/extracted.json
 """
 
+from __future__ import annotations
+
 import json
 import re
 import sys
