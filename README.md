@@ -24,13 +24,27 @@ An AI agent skill that auto-hooks into task completion and syncs structured know
 
 ### Installation
 
-1. **Clone or copy** this repository into your skills directory:
+1. **Clone or copy** this repository:
 
    ```bash
    git clone https://github.com/<your-username>/notes-skill.git
    ```
 
-2. **Register** `SKILL.md` as a custom skill in your AI agent platform.
+2. **Register the skill in Claude Code** (or your AI agent platform).
+
+   > ⚠️ **Important:** Simply creating a symlink in `~/.claude/skills/` is NOT enough. Skills must be registered through Claude Code's plugin system. A bare symlink will show as "Unknown" and won't be callable.
+
+   **Claude Code:**
+   
+   In Claude Code, run this slash command to install the skill:
+   
+   ```
+   /plugin install /path/to/notes-skill
+   ```
+   
+   This registers `notes-skill` in the plugin system and creates the proper symlink. Verify it worked by checking that the skill list shows `notes-skill` by name (not "Unknown").
+
+   **Other platforms:** Register `SKILL.md` as a custom skill following your platform's documentation.
 
 3. **First run** — the skill auto-detects it hasn't been set up and enters setup mode:
 

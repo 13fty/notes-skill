@@ -26,13 +26,27 @@
 
 ### 安装
 
-1. **克隆或复制**此仓库到你的 skill 目录：
+1. **克隆或复制**此仓库：
 
    ```bash
    git clone https://github.com/<your-username>/notes-skill.git
    ```
 
-2. **注册** `SKILL.md` 为你 AI agent 平台的自定义 skill。
+2. **在 Claude Code（或你的 AI agent 平台）中注册 skill。**
+
+   > ⚠️ **重要：** 仅在 `~/.claude/skills/` 中创建 symlink **不够**。Skill 必须通过 Claude Code 的插件系统注册。裸 symlink 会显示为 "Unknown" 且无法被调用。
+
+   **Claude Code：**
+   
+   在 Claude Code 中运行以下 slash command 安装 skill：
+   
+   ```
+   /plugin install /path/to/notes-skill
+   ```
+   
+   这会在插件系统中注册 `notes-skill` 并创建正确的 symlink。安装后可在 skill 列表中看到 `notes-skill` 名称（而非 "Unknown"）即为成功。
+
+   **其他平台：** 按照对应平台的文档将 `SKILL.md` 注册为自定义 skill。
 
 3. **首次运行**——skill 会自动检测尚未配置并进入 setup 模式：
 
