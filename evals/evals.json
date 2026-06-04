@@ -1,0 +1,56 @@
+{
+  "skill_name": "agent-knowledge",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Agent just finished building a FastAPI service with Docker deployment. User says: save this to obsidian.",
+      "expected_output": "extract.py produces structured JSON; write_vault.py updates Daily Note, Project Note, Tech Index; graph_update.py appends edges.",
+      "expectations": [
+        "extract.py detects tech: Python, FastAPI, Docker",
+        "write_vault.py appends to Daily/YYYY-MM-DD.md under ## AI Sessions",
+        "write_vault.py creates or updates Projects/{name}.md with session log",
+        "write_vault.py merges tech into Meta/Tech Stack Index.md",
+        "graph_update.py appends used-in edges for each tech",
+        "graph_update.py updates Meta/Nodes.md with new nodes"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "帮我整理一下今天的笔记。Agent 用 PyQt5 和 OpenCV 写了一个手势识别程序，遇到了摄像头驱动报错，最后通过更新驱动和调整 OpenCV 参数解决了。",
+      "expected_output": "extract.py detects Chinese problem signals; write_vault.py writes both Daily and Project notes; graph_update.py adds edges.",
+      "expectations": [
+        "extract.py detects tech: Python, PyQt5, OpenCV",
+        "extract.py detects problem (报错) and solution (解决了) pair",
+        "write_vault.py appends Chinese content to Daily Note",
+        "write_vault.py creates QA entry in Project Note ## Problems & Solutions",
+        "write_vault.py appends to Meta/QA Archive.md"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I'm starting a new project called 'WeatherTracker' — TypeScript, Next.js, OpenAI API. We also set up Docker and GitHub Actions for CI. Save this session.",
+      "expected_output": "Full pipeline: extract → write → graph for a new project with 5 techs.",
+      "expectations": [
+        "extract.py infers project_name = 'WeatherTracker'",
+        "write_vault.py creates Projects/WeatherTracker.md from template",
+        "Tech Stack table includes: TypeScript, Next.js, OpenAI, Docker, GitHub Actions",
+        "frontmatter updated: field set to today's date",
+        "graph_update.py appends 5 used-in edges",
+        "graph_update.py creates Nodes entries for all 5 techs",
+        "Concepts/ stubs created for missing tech nodes"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Agent just debugged a gnarly issue: the React app was throwing 'Cannot read properties of undefined' because an API response shape changed. Root cause was a backend schema migration that didn't update the API contract. Fixed by adding a version header and updating the frontend to check the API version before destructuring. Project: Dashboard v2. Save this.",
+      "expected_output": "Complex bug fix captured as a detailed Q&A pair with graph edge for solved-by relation.",
+      "expectations": [
+        "extract.py detects problem-solution pair with detailed context",
+        "QA entry includes version-mismatch root cause",
+        "Tech: React, TypeScript (frontend), plus backend tech if mentioned",
+        "graph_update.py adds solved-by edge",
+        "Knowledge Graph captures the cross-stack dependency"
+      ]
+    }
+  ]
+}

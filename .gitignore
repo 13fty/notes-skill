@@ -20,6 +20,10 @@ Thumbs.db
 
 # Config (user's — never commit)
 .obsidian-skill/
+config/vault_config.json
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # Virtual env
 venv/

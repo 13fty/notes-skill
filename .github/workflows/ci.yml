@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check syntax validity
+        run: |
+          python -m py_compile scripts/extract.py
+          python -m py_compile scripts/write_vault.py
+          python -m py_compile scripts/graph_update.py
+          python -m py_compile scripts/setup.py
+
+      - name: Run extraction smoke test
+        run: |
+          echo 'Implemented a FastAPI endpoint for user auth. Fixed a Docker build issue by adding pydantic to requirements.txt.' | python scripts/extract.py
