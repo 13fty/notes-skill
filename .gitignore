@@ -28,3 +28,5 @@ config/vault_config.json
 # Virtual env
 venv/
 .venv/
+obsidian-note-framework.md
+obsidian-skill-design.md
