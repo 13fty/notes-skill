@@ -23,11 +23,15 @@ jobs:
 
       - name: Check syntax validity
         run: |
-          python -m py_compile scripts/extract.py
-          python -m py_compile scripts/write_vault.py
-          python -m py_compile scripts/graph_update.py
+          python -m py_compile scripts/parse_session.py
+          python -m py_compile scripts/sync.py
           python -m py_compile scripts/setup.py
 
-      - name: Run extraction smoke test
+      - name: Run parse smoke test
         run: |
-          echo 'Implemented a FastAPI endpoint for user auth. Fixed a Docker build issue by adding pydantic to requirements.txt.' | python scripts/extract.py
+          echo 'Implemented a FastAPI endpoint for user auth. Fixed a Docker build issue by adding pydantic to requirements.txt.' | python scripts/parse_session.py
+
+      - name: Run sync dry-run smoke test
+        run: |
+          echo 'Implemented a FastAPI endpoint for user auth.' | python scripts/parse_session.py --output /tmp/test.json
+          python scripts/sync.py --input /tmp/test.json --dry-run
