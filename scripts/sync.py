@@ -573,9 +573,14 @@ def _write_knowledge_node(vault_path: str, node: dict, date_str: str, project: s
         if code_blocks:
             lang = code_blocks[0].get("language", "python")
             code = code_blocks[0].get("code", "# TODO")
-            code_section = f"## 代码片段\n\n```{lang}\n{code}\n```"
+            code_section = "## 代码片段\n\n```{}\n{}\n```".format(lang, code)
 
-        template = f"""---
+        fallback_desc = "{} — {}".format(tech_name, node_type)
+        fallback_code = "## 代码片段\n\n```python\n# TODO: minimal working example\n```"
+        description = node.get("description", fallback_desc)
+        code_block = code_section or fallback_code
+
+        template = """---
 type: {node_type}
 tags: []
 first_seen: {date_str}
@@ -585,13 +590,13 @@ first_seen: {date_str}
 
 ## 一句话
 
-{node.get('description', f'{tech_name} — {node_type}')}
+{description}
 
 ## 核心机制
 
 -
 
-{code_section or '## 代码片段\n\n```python\n# TODO: minimal working example\n```'}
+{code_block}
 
 ## 与其他概念的关系
 
@@ -606,8 +611,16 @@ first_seen: {date_str}
 
 ## 来源会话
 
-[[Sessions/{date_str}-{time_now()}]]
-"""
+[[Sessions/{date_str}-{time}]]
+""".format(
+            node_type=node_type,
+            date_str=date_str,
+            tech_name=tech_name,
+            description=description,
+            code_block=code_block,
+            project=project,
+            time=time_now(),
+        )
         node_path.write_text(template, encoding="utf-8")
         return f"Created {node_path}"
 
