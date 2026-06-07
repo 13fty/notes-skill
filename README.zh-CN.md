@@ -11,9 +11,12 @@
 ## 设计理念
 
 - **自动触发**：agent 任务完成后自动运行，不依赖用户手动请求
-- **仅追加写入**：绝不删除或覆盖用户已有内容
-- **结构化提取**：将零散的对话转化为类型化的知识（技术栈、变更记录、问答、图谱边）
-- **跨项目感知**：自动推断项目之间的关联关系
+- **3 层笔记框架**：会话层 → 项目层 → 知识层 —— 从原始对话到可复用知识的清晰信息流
+- **8 步 AI 驱动流水线**：摘要 → 日记 → 项目笔记 → 知识节点 → 问答 → Wiki 链接 → 项目关联 → 知识图谱
+- **仅追加写入**：绝不删除或覆盖用户已有内容；所有写入均为追加或节级合并
+- **统一知识节点**：一种模板覆盖全部知识类型（概念/工具/框架/模式）—— 替代了分散的代码片段、概念笔记、技术卡片、架构决策模板
+- **双语支持**：中英文信号词检测，覆盖技术分类、问题/解答配对和变更追踪
+- **跨项目感知**：自动推断项目之间的关联关系（技术重叠、演进链等）
 - **持续增长**：知识图谱边随时间累积；用得越久，信息越丰富
 
 ## 快速开始
@@ -59,42 +62,59 @@
 
 ## 工作原理
 
-### 流水线
+### 8 步流水线
 
 ```
 会话完成
       │
       ▼
-config/vault_config.json 存在？ ──否──> SETUP 模式: scripts/setup.py
+Step 1: 生成会话摘要（AI 驱动）
       │
-     是
+      ├─ Step 2: 更新日记（追加行到 ## Sessions 表格）
+      ├─ Step 3: 更新项目笔记（前置到 ## Changelog）
+      ├─ Step 4: 提取技术 → 创建/更新 Knowledge 节点 ── parse_session.py
+      ├─ Step 5: 提取问答 → 会话日志 + Knowledge 节点踩坑记录 ── parse_session.py
+      ├─ Step 6: 自动生成 Wiki 链接（Daily/, Projects/, Knowledge/）
+      ├─ Step 7: 推断跨项目关联（技术重叠 ≥2）
+      └─ Step 8: 维护 Knowledge-Graph + Projects-Index
       │
       ▼
-extract.py ──> extracted.json
-      │
-      ▼
-write_vault.py ──> 日记、项目笔记、技术栈索引、问答归档
-      │
-      ▼
-graph_update.py ──> 知识图谱边、节点注册表、跨项目关联
+sync.py 写入 obsidian-file 块 → 笔记库
 ```
+
+### 两个脚本工具
+
+| 脚本 | 用途 |
+|------|------|
+| `parse_session.py` | NLP 提取：技术栈（6 大类）、问答对（段落级匹配）、Wiki 链接生成（首次出现才链接，最长匹配优先）、会话时间（HHMM） |
+| `sync.py` | 笔记库 I/O：解析 `obsidian-file` 块或 JSON，写入 Daily/Project/Knowledge/Knowledge-Graph/Projects-Index |
+
+### 笔记库布局（5 个目录）
+
+| 目录 | 用途 | 示例 |
+|------|------|------|
+| `Sessions/` | 每次 Agent 任务一条日志 | `2026-06-07-1430.md` |
+| `Projects/` | 每个项目一个文件（Changelog 驱动） | `MyApp.md` |
+| `Daily/` | 每日概览（表格形式 Sessions 列表） | `2026-06-07.md` |
+| `Knowledge/` | 统一知识节点（概念/工具/框架/模式） | `Unix-Domain-Socket.md` |
+| `Meta/` | Knowledge-Graph.md + Projects-Index.md | — |
 
 ### 写入内容
 
 | 目标 | 文件 | 操作 |
-|--------|------|-----------|
-| 日记 | `Daily/YYYY-MM-DD.md` | 追加到 `## AI Sessions` |
-| 项目笔记 | `Projects/{name}.md` | 前置插入 `## Session Log`，合并 `## Tech Stack` |
-| 技术栈索引 | `Meta/Tech Stack Index.md` | 合并条目（去重） |
-| 问答归档 | `Meta/QA Archive.md` | 追加问题-解决方案对 |
-| 知识图谱 | `Meta/Knowledge Graph.md` | 追加边（按三元组去重） |
-| 节点注册表 | `Meta/Nodes.md` | 合并节点条目 |
+|------|------|------|
+| 日记 | `Daily/YYYY-MM-DD.md` | 追加行到 `## Sessions` 表格（时间/项目/做了什么/时长） |
+| 会话日志 | `Sessions/YYYY-MM-DD-HHMM.md` | 创建完整会话详情（修改了什么/对话摘要/知识点/遗留问题/收获） |
+| 项目笔记 | `Projects/{name}.md` | 前置到 `## Changelog`（含修改文件列表 + 遗留问题） |
+| 知识节点 | `Knowledge/{Name}.md` | 创建或合并（踩坑记录表 + 来源会话） |
+| 知识图谱 | `Meta/Knowledge-Graph.md` | 追加边（按 Source+Relation+Target 去重） |
+| 项目索引 | `Meta/Projects-Index.md` | 合并项目行（更新日期 + 技术栈） |
 
 ## 目录结构
 
 ```
 notes-skill/
-├── SKILL.md                       # ⭐ 入口——AI 首先读取此文件
+├── SKILL.md                       # ⭐ 入口——AI 首先读取此文件（8 步 + 3 层指南）
 ├── LICENSE.txt                    # MIT 许可证
 ├── README.md
 ├── README.zh-CN.md                # 中文说明
@@ -104,19 +124,21 @@ notes-skill/
 │
 ├── scripts/
 │   ├── __init__.py                # Python 包标记
-│   ├── setup.py                   # 首次 setup 向导
-│   ├── extract.py                 # 会话 → 结构化知识 JSON
-│   ├── write_vault.py             # 写入/追加笔记到笔记库
-│   └── graph_update.py            # 更新知识图谱边
+│   ├── setup.py                   # 首次笔记库发现与初始化
+│   ├── parse_session.py           # 会话 → 结构化知识 JSON
+│   │                              #   模块 A: 技术栈提取
+│   │                              #   模块 B: 问答对提取
+│   │                              #   模块 C: Wiki 链接生成
+│   └── sync.py                    # 将知识写入笔记库
+│                                  #   模式 1: obsidian-file 块（设计标准）
+│                                  #   模式 2: JSON 流水线（向后兼容）
 │
 ├── references/
-│   ├── note_templates.md          # 所有笔记类型的 Markdown 模板
-│   ├── extract_rules.md           # 分类规则、信号词
-│   ├── graph_schema.md            # 节点/边类型定义
-│   └── vault_structure.md         # 推荐的笔记库目录规范
+│   └── templates.md               # 全部 6 种笔记模板 + 技术分类规则
+│                                  #   + 图谱 schema + 笔记库结构 + 命名约定
 │
-├── agents/
-│   └── knowledge_extractor.md     # 用于复杂会话提取的子 agent
+├── obsidian-note-framework.md     # 3 层笔记框架设计文档
+├── obsidian-skill-design.md       # 8 步 skill 架构设计文档
 │
 └── evals/
     └── evals.json                 # 回归测试用例
@@ -124,27 +146,72 @@ notes-skill/
 
 ## 使用方式
 
-### 手动运行流水线
+### obsidian-file 块模式（推荐）
+
+AI 生成 `obsidian-file` 块并通过管道传给 `sync.py`：
+
+````bash
+cat << 'EOF' | python scripts/sync.py
+```obsidian-file
+path: Sessions/2026-06-07-1430.md
+action: create
+---
+---
+date: 2026-06-07
+time: 14:30
+duration: 45min
+project: MyAPI
+type: coding
+tags: [python, docker]
+
+# 2026-06-07 14:30 · MyAPI · 修复 Docker 构建
+
+## 📁 项目
+[[Projects/MyAPI]] · `requirements.txt`, `Dockerfile`
+
+## ✏️ 修改了什么
+### 修改
+- `requirements.txt` — 添加 pydantic 依赖
+
+## 💬 对话摘要
+修复了因缺少 pydantic 导致的 Docker 构建失败。
+
+## 🔗 涉及的知识点
+| 知识点 | 关系 | 备注 |
+|--------|------|------|
+| [[Knowledge/Pydantic]] | 核心机制 | 构建依赖 |
+```
+
+```obsidian-file
+path: Daily/2026-06-07.md
+action: append
+section: ## Sessions
+---
+| 14:30 | [[Projects/MyAPI]] | 修复 Docker 构建，添加 pydantic | 45min |
+```
+EOF
+````
+
+**三种操作**：`create`（文件不存在时创建）、`append`（在指定节标题下追加）、`replace-section`（替换整节内容）。
+
+### JSON 流水线模式（向后兼容）
 
 ```bash
-# 步骤 1：从对话中提取结构化知识
-python scripts/extract.py --session-text "<对话内容>" --output /tmp/extracted.json
+# 步骤 1：解析会话文本为结构化 JSON
+python scripts/parse_session.py --session-text "<对话内容>" --output /tmp/parsed.json
 
-# 步骤 2：将笔记写入笔记库（日记、项目笔记、技术栈索引、问答归档）
-python scripts/write_vault.py --input /tmp/extracted.json
-
-# 步骤 3：更新知识图谱边和节点注册表
-python scripts/graph_update.py --input /tmp/extracted.json
+# 步骤 2：将所有内容写入笔记库
+python scripts/sync.py --input /tmp/parsed.json
 ```
 
 ### 试运行模式
 
-所有写入脚本均支持 `--dry-run`，可预览变更而不实际写入：
-
 ```bash
-python scripts/write_vault.py --input extracted.json --dry-run
-python scripts/graph_update.py --input extracted.json --dry-run
+python scripts/sync.py --input output.md --dry-run
+python scripts/sync.py --input parsed.json --dry-run
 ```
+
+在实际写入前预览所有变更——可安全地在任何环境中运行。
 
 ## 自动触发条件
 

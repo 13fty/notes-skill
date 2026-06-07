@@ -33,10 +33,7 @@ VAULT_SUBDIRS = [
     "Daily",
     "Sessions",
     "Projects",
-    "Snippets",
-    "Concepts",
-    "Tech",
-    "Decisions",
+    "Knowledge",
     "Meta",
 ]
 
