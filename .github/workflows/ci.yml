@@ -33,6 +33,7 @@ jobs:
 
       - name: Run sync dry-run smoke test
         run: |
+          mkdir -p /tmp/test_vault
           echo 'Implemented a FastAPI endpoint for user auth.' | python scripts/parse_session.py --output /tmp/ci_test.json
-          python scripts/sync.py --input /tmp/ci_test.json --dry-run
+          python scripts/sync.py --vault /tmp/test_vault --input /tmp/ci_test.json --dry-run
           rm -f /tmp/ci_test.json
